@@ -51,9 +51,9 @@ public class client {
     }
 
     // Starts a connection with the server with the given IP and port
-    private void startConnection(String ip, int port) {
+    private void startConnection(String host, int port) {
         try {
-            clientSocket = new Socket(ip, port);
+            clientSocket = new Socket(host, port);
             sc = new Scanner(System.in);
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
@@ -65,7 +65,7 @@ public class client {
                 handleClient();
             }
         } catch (IOException e) {
-            System.out.println("Client could not connect to server " + ip + ":" + port + ": " + e.toString());
+            System.out.println("Client could not connect to server " + host + ":" + port + ": " + e.toString());
         }
     }
 
