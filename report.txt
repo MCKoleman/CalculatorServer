@@ -1,6 +1,0 @@
-make client
-java -jar client.jar
-
-make server
-java -jar server.jar
-
