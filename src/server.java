@@ -156,10 +156,18 @@ public class server {
     // Stops the server, closing all connections
     private void stopServer() {
         try {
-            in.close();
-            out.close();
-            clientSocket.close();
-            serverSocket.close();
+            if (in != null) {
+                in.close();
+            }
+            if (out != null) {
+                out.close();
+            }
+            if (clientSocket != null) {
+                clientSocket.close();
+            }
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
         } catch (IOException e) {
             System.out.println("Server closed with error: " + e.toString());
             return;

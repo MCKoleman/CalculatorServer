@@ -72,9 +72,15 @@ public class client {
     // Closes the connection with the server
     private void stopConnection() {
         try {
-            in.close();
-            out.close();
-            clientSocket.close();
+            if (in != null) {
+                in.close();
+            }
+            if (out != null) {
+                out.close();
+            }
+            if (clientSocket != null) {
+                clientSocket.close();
+            }
         } catch (IOException e) {
             System.out.println("Client closed with error: " + e.toString());
         }
