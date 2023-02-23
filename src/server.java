@@ -64,6 +64,7 @@ public class server {
                     return result;
                 // Handle multiplication
                 case MULTIPLY_CMD:
+                    result = 1;
                     for (int i = 1; i < params.length; i++) {
                         result *= Integer.parseInt(params[i]);
                     }
@@ -129,8 +130,10 @@ public class server {
                 // Only start server operations on correct handshake
                 String handshake = in.readLine();
                 if (!handshake.equals(CLIENT_HELLO)) {
+                    System.out.println("Client attempted to connect with invalid handshake: " + handshake);
                     out.println("Handshake not recognized");
                 } else {
+                    System.out.println("Client connected.");
                     out.println(SERVER_HELLO);
                     returnFlag = handleClient();
                 }
