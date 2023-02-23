@@ -35,7 +35,6 @@ public class client {
                 }
             } catch (NumberFormatException e) {}
         }
-        System.out.println("exit");
         stopConnection();
     }
 

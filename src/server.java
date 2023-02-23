@@ -144,7 +144,7 @@ public class server {
     // Starts the server on the given port
     private void startServer(int port) {
         try {
-            serverSocket = new ServerSocket();
+            serverSocket = new ServerSocket(port);
             System.out.println("Server started on port " + port);
             handleServer();
         } catch (IOException e) {
