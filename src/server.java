@@ -57,7 +57,7 @@ public class server {
                     return result;
                 // Handle subtraction
                 case SUBTRACT_CMD:
-                    result = Integer.parseInt(params[2]);
+                    result = Integer.parseInt(params[1]);
                     for (int i = 2; i < params.length; i++) {
                         result -= Integer.parseInt(params[i]);
                     }
