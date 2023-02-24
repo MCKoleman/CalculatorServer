@@ -19,6 +19,7 @@ public class client {
             try {
                 // Handle results
                 int result = Integer.parseInt(status);
+                System.out.print("receive: ");
                 if (result == -1) {
                     System.out.println("-1: incorrect operation command");
                 } else if (result == -2) {
@@ -61,7 +62,7 @@ public class client {
             // Greet server, and start client if greeting matches
             String response = sendMessage(CLIENT_HELLO);
             if (response.equals(SERVER_HELLO)) {
-                System.out.println(response);
+                System.out.println("receive: " + response);
                 handleClient();
             }
         } catch (IOException e) {

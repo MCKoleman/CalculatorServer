@@ -102,10 +102,10 @@ public class server {
                         // Close server
                         return EXIT;
                     default:
-                        System.out.println("Client: " + inputLine);
-
                         // Handle calculation and request next input
-                        out.println(handleCalculation(inputLine));
+                        int result = handleCalculation(inputLine);
+                        out.println(result);
+                        System.out.println("get: " + inputLine + ", return: " + result);
                         break;
                 }
             }
@@ -133,7 +133,8 @@ public class server {
                     System.out.println("Client attempted to connect with invalid handshake: " + handshake);
                     out.println("Handshake not recognized");
                 } else {
-                    System.out.println("Client connected.");
+                    String clientIP = ((InetSocketAddress)clientSocket.getRemoteSocketAddress()).getAddress().toString().replace("/", "");
+                    System.out.println("get connection from " + clientIP);
                     out.println(SERVER_HELLO);
                     returnFlag = handleClient();
                 }
