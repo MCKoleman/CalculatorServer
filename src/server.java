@@ -29,6 +29,7 @@ public class server {
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
+    private String clientIP;
 
     // Handles the calculation command given, returning the result or an error for invalid input
     private int handleCalculation(String input) {
@@ -94,10 +95,11 @@ public class server {
                         // Keep server up, waiting for new clients
                         return SERVER_OK;
                     case TERMINATE_CMD:
-                        System.out.println("Closing connection to client...");
+                        System.out.println("Closing connection to client " + clientIP);
 
                         // Close client
                         out.println(EXIT);
+                        clientIP = "";
 
                         // Close server
                         return EXIT;
@@ -133,7 +135,7 @@ public class server {
                     System.out.println("Client attempted to connect with invalid handshake: " + handshake);
                     out.println("Handshake not recognized");
                 } else {
-                    String clientIP = ((InetSocketAddress)clientSocket.getRemoteSocketAddress()).getAddress().toString().replace("/", "");
+                    clientIP = ((InetSocketAddress)clientSocket.getRemoteSocketAddress()).getAddress().toString().replace("/", "");
                     System.out.println("get connection from " + clientIP);
                     out.println(SERVER_HELLO);
                     returnFlag = handleClient();
