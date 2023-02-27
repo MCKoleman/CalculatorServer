@@ -87,7 +87,7 @@ public class server {
             while ((inputLine = in.readLine()) != null) {
                 switch (inputLine) {
                     case EXIT_CMD:
-                        System.out.println("Closing connection to client...");
+                        System.out.println("Closing connection to client " + clientIP);
 
                         // Close client
                         out.println(EXIT);
