@@ -5,7 +5,7 @@ import java.util.ArrayList;
 public class receiver {
     private static final String RECEIVER_HELLO = "Receiver Hello!";
     private static final String NETWORK_HELLO = "Network Hello!";
-    private static final String GOODBYE = "Goodbye!";
+    private static final String EXIT_CMD = "-1";
 
     private Socket receiverSocket;
     private PrintWriter out;
@@ -17,24 +17,35 @@ public class receiver {
 
         // Receive packets
         int expectedID = 1;
-        byte expectedAck = 0;
+        int packetsReceived = 0;
+        byte waitingAck = 0;
         while (true) {
             try {
-                // Check if packet is expected and correct
-                Packet inputPacket = new Packet(in.readLine());
-                if (inputPacket.getAck() == expectedAck && inputPacket.verifyChecksum() && inputPacket.getID() == expectedID) {
-                    out.println(new Packet(expectedAck, 0, "").getPacket());
-                    packetList.add(inputPacket);
-                    expectedAck = getOppositeAck(expectedAck);
-                    expectedID++;
+                // Exit when receiving the exit string
+                String input = in.readLine();
+                if (input.equals(EXIT_CMD)) {
+                    break;
+                }
 
-                    // If last character of packet is '.', terminate connections
-                    if (inputPacket.getContent().charAt(inputPacket.getContent().length()-1) == '.') {
-                        out.println(GOODBYE);
-                        break;
-                    }
+                // Check if packet is expected and correct
+                Packet inputPacket = new Packet(input);
+                packetsReceived++;
+                Boolean isCorrectAck = inputPacket.getAck() == waitingAck;
+                Boolean isCorrectChecksum = inputPacket.verifyChecksum();
+                Boolean isCorrectPacket = inputPacket.getID() == expectedID;
+
+                System.out.print("Waiting " + waitingAck + ", " + packetsReceived + ", " + expectedID + ", " + inputPacket.toString());
+                
+                // Receive correct package and acknowledge it
+                if (isCorrectAck && isCorrectChecksum && isCorrectPacket) {
+                    System.out.println("ACK" + (int)waitingAck);
+                    out.println(new Packet(waitingAck, 0, "").getPacket());
+                    packetList.add(inputPacket);
+                    waitingAck = getOppositeAck(waitingAck);
+                    expectedID++;
                 } else {
-                    out.println(new Packet(getOppositeAck(expectedAck), 0, "").getPacket());
+                    System.out.println("ACK" + (int)getOppositeAck(waitingAck));
+                    out.println(new Packet(getOppositeAck(waitingAck), 0, "").getPacket());
                 }
             } catch (IOException e) {
                 System.out.println("Receiver could not read input.");
@@ -134,6 +145,46 @@ public class receiver {
     private static byte getOppositeAck(byte ack) {
         return (byte)((ack + 1) % 2);
     }
+
+    // Converts bytes to hex
+    private static String bytesToHex(byte[] byteArray) {
+        StringBuffer hexStringBuffer = new StringBuffer();
+        for (int i = 0; i < byteArray.length; i++) {
+            hexStringBuffer.append(byteToHex(byteArray[i]));
+        }
+        return hexStringBuffer.toString();
+    }
+
+    private static String byteToHex(byte num) {
+        char[] hexDigits = new char[2];
+        hexDigits[0] = Character.forDigit((num >> 4) & 0xF, 16);
+        hexDigits[1] = Character.forDigit((num & 0xF), 16);
+        return new String(hexDigits);
+    }
+
+    // Converts hex to bytes
+    private static byte[] hexToBytes(String hex) {
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < hex.length(); i += 2) {
+            bytes[i / 2] = hexToByte(hex.substring(i, i + 2));
+        }
+        return bytes;
+    }
+
+    private static byte hexToByte(String hexString) {
+        int firstDigit = toDigit(hexString.charAt(0));
+        int secondDigit = toDigit(hexString.charAt(1));
+        return (byte) ((firstDigit << 4) + secondDigit);
+    }
+
+    private static int toDigit(char hexChar) {
+        int digit = Character.digit(hexChar, 16);
+        if(digit == -1) {
+            throw new IllegalArgumentException(
+              "Invalid Hexadecimal Character: "+ hexChar);
+        }
+        return digit;
+    }
     
     private static class Packet {
         private byte ack;
@@ -146,7 +197,7 @@ public class receiver {
             this.packet = _packet;
             this.checksum = 0;
             this.content = "";
-            byte[] byteList = packet.getBytes();
+            byte[] byteList = hexToBytes(packet);
             for (int i = 0; i < byteList.length; i++) {
                 if (i == 0) {
                     ack = byteList[i];
@@ -161,8 +212,8 @@ public class receiver {
         }
 
         public Packet(int _ack, int _id, String _content) {
-            this.ack = (byte)(ack & 0x000000FF);
-            this.id = (byte)(id & 0x000000FF);
+            this.ack = (byte)(_ack & 0x000000FF);
+            this.id = (byte)(_id & 0x000000FF);
             this.content = _content;
             
             checksum = calculateChecksum(content);
@@ -180,7 +231,7 @@ public class receiver {
             for (int i = 0; i < _content.length(); i++) {
                 bytePacket[i + 6] = (byte)((int)_content.charAt(i) & 0x000000FF);
             }
-            return bytePacket.toString();
+            return bytesToHex(bytePacket);
         }
 
         // Calculates the checksum for the given content
@@ -193,10 +244,11 @@ public class receiver {
         }
 
         public String toString() {
-            return "PACKET ACK" + (int)ack + ", ID#" + (int)id + ", SUM=" + ", CONTENT: " + content;
+            return (int)ack + " " + (int)id + " " + checksum + " " + content;
+            //return "PACKET" + (int)id + " ACK" + (int)ack + ", " + checksum + ", CONTENT: " + content + ", DIGEST: " + packet;
         }
 
-        public Boolean verifyChecksum() { return calculateChecksum(content) == checksum; }
+        public Boolean verifyChecksum() { return calculateChecksum(content) == getChecksum(); }
         public String getPacket() { return packet; }
         public byte getAck() { return ack; }
         public byte getID() { return id; }

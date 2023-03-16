@@ -5,6 +5,8 @@ import java.util.ArrayList;
 public class sender {
     private static final String SENDER_HELLO = "Sender Hello!";
     private static final String NETWORK_HELLO = "Network Hello!";
+    private static final String EXIT_CMD = "-1";
+    private static final int DROP_PACKET = 2;
 
     private Socket senderSocket;
     private PrintWriter out;
@@ -20,7 +22,7 @@ public class sender {
         try {
             packetReader = new BufferedReader(new FileReader(file));
             while((line = packetReader.readLine()) != null) {
-                packetList.addAll(messageToPackets(line));
+                packetList.addAll(messageToPackets(line.trim(), packetList.size()+1));
             }
             packetReader.close();
         } catch (IOException e) {
@@ -31,25 +33,35 @@ public class sender {
         // Debug print packets to be sent
         System.out.println("Debug printing packets:");
         for (int i = 0; i < packetList.size(); i++) {
-            System.out.println("[" + i + "]: " + packetList.get(i).getContent() + ", digest: " + packetList.get(i).getPacket());
+            System.out.println("[" + packetList.get(i).getID() + "]: " + packetList.get(i).getContent() + ", ACK" + packetList.get(i).getAck() + ", digest: " + packetList.get(i).getPacket());
         }
 
         // Send packets
         int packetIndex = 0;
+        int packetsSent = 0;
         while (true) {
-            // Continually send packets until the last packet is sent
-            if (packetIndex >= packetList.size()) {
-                break;
-            }
-            byte expectedAck = getOppositeAck(packetList.get(packetIndex).getAck());
-            Packet returnPacket = new Packet(sendMessage(packetList.get(packetIndex).getPacket()));
+            Packet sentPacket = packetList.get(packetIndex);
+            byte waitingAck = sentPacket.getAck();
+            Packet returnPacket = new Packet(sendMessage(sentPacket.getPacket()));
+            packetsSent++;
 
             // Check ACK
-            System.out.println(returnPacket.toString());
-            if (returnPacket.getAck() == expectedAck) {
+            //System.out.println("Sent: " + sentPacket.toString());
+            //System.out.println("Received: " + returnPacket.toString());
+            System.out.print("Waiting ACK" + waitingAck + ", " + packetsSent + ", ");
+            if (returnPacket.getAck() == DROP_PACKET) { // If dropped packet, resend
+                System.out.println("DROP, resend Packet" + sentPacket.getAck());
+            } else if (returnPacket.getAck() == waitingAck) { // If received the ACK that was waited for, send next packet
                 packetIndex++;
+                // Continually send packets until the last packet is sent
+                if (packetIndex >= packetList.size()) {
+                    System.out.println("no more packets to send");
+                    out.println(EXIT_CMD);
+                    break;
+                }
+                System.out.println("PASS, sending next Packet" + packetList.get(packetIndex).getAck());
             } else {
-                System.out.println("Invalid ACK, requesting same packet again.");
+                System.out.println("CORRUPT, resend Packet" + sentPacket.getAck());
             }
         }
         stopConnection();
@@ -143,19 +155,55 @@ public class sender {
         curSender.stopConnection();
     }
 
-    // Returns the opposite ACK of the given ACK
-    private static byte getOppositeAck(byte ack) {
-        return (byte)((ack + 1) % 2);
-    }
-
     //
-    private static ArrayList<Packet> messageToPackets(String message) {
-        String[] parts = message.trim().split("\\s+");
+    private static ArrayList<Packet> messageToPackets(String message, int startIndex) {
+        String[] parts = message.trim().replaceAll("\\P{InBasic_Latin}", "").split("\\s+");
         ArrayList<Packet> packets = new ArrayList<>();
         for (int i = 0; i < parts.length; i++) {
-            packets.add(new Packet(i % 2, i + 1, parts[i]));
+            packets.add(new Packet((i + startIndex - 1) % 2, i + startIndex, parts[i].trim()));
         }
         return packets;
+    }
+    
+    // Converts bytes to hex
+    private static String bytesToHex(byte[] byteArray) {
+        StringBuffer hexStringBuffer = new StringBuffer();
+        for (int i = 0; i < byteArray.length; i++) {
+            hexStringBuffer.append(byteToHex(byteArray[i]));
+        }
+        return hexStringBuffer.toString();
+    }
+
+    private static String byteToHex(byte num) {
+        char[] hexDigits = new char[2];
+        hexDigits[0] = Character.forDigit((num >> 4) & 0xF, 16);
+        hexDigits[1] = Character.forDigit((num & 0xF), 16);
+        return new String(hexDigits);
+    }
+
+    // Converts hex to bytes
+    private static byte[] hexToBytes(String hex) {
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < hex.length(); i += 2) {
+            bytes[i / 2] = hexToByte(hex.substring(i, i + 2));
+        }
+        return bytes;
+        //return new BigInteger(hex, 16).toByteArray();
+    }
+
+    private static byte hexToByte(String hexString) {
+        int firstDigit = toDigit(hexString.charAt(0));
+        int secondDigit = toDigit(hexString.charAt(1));
+        return (byte) ((firstDigit << 4) + secondDigit);
+    }
+
+    private static int toDigit(char hexChar) {
+        int digit = Character.digit(hexChar, 16);
+        if(digit == -1) {
+            throw new IllegalArgumentException(
+              "Invalid Hexadecimal Character: "+ hexChar);
+        }
+        return digit;
     }
     
     private static class Packet {
@@ -169,7 +217,7 @@ public class sender {
             this.packet = _packet;
             this.checksum = 0;
             this.content = "";
-            byte[] byteList = packet.getBytes();
+            byte[] byteList = hexToBytes(packet);
             for (int i = 0; i < byteList.length; i++) {
                 if (i == 0) {
                     ack = byteList[i];
@@ -184,8 +232,8 @@ public class sender {
         }
 
         public Packet(int _ack, int _id, String _content) {
-            this.ack = (byte)(ack & 0x000000FF);
-            this.id = (byte)(id & 0x000000FF);
+            this.ack = (byte)(_ack & 0x000000FF);
+            this.id = (byte)(_id & 0x000000FF);
             this.content = _content;
             
             checksum = calculateChecksum(content);
@@ -203,7 +251,7 @@ public class sender {
             for (int i = 0; i < _content.length(); i++) {
                 bytePacket[i + 6] = (byte)((int)_content.charAt(i) & 0x000000FF);
             }
-            return bytePacket.toString();
+            return bytesToHex(bytePacket);
         }
 
         // Calculates the checksum for the given content
@@ -216,14 +264,12 @@ public class sender {
         }
 
         public String toString() {
-            return "PACKET" + (int)id + " ACK" + (int)ack + ", " + checksum + ", CONTENT: " + content;
+            return "PACKET" + (int)id + " ACK" + (int)ack + ", " + checksum + ", CONTENT: " + content + ", DIGEST: " + packet;
         }
 
-        public Boolean verifyChecksum() { return calculateChecksum(content) == checksum; }
         public String getPacket() { return packet; }
         public byte getAck() { return ack; }
         public byte getID() { return id; }
-        public int getChecksum() { return checksum; }
         public String getContent() { return content; }
     }
 }
