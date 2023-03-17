@@ -12,6 +12,47 @@ public class sender {
     private PrintWriter out;
     private BufferedReader in;
 
+    // Sender: Transmits a message to the receiver through the network relay
+    public static void main(String[] args) {
+        // Only start sender if port number and ip are explicitly given
+        if (args.length < 2) {
+            System.out.println("Could not start sender: No URL/port given.");
+            return;
+        }
+        
+        // Gather info needed to start connection
+        sender curSender = new sender();
+        String url = args[0];
+        int portNum = 0;
+
+        // Get port number
+        try {
+            portNum = Integer.parseInt(args[1]);
+            if (portNum < 0 || portNum > 65535) {
+                throw new NumberFormatException("Invalid number.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Could not start sender: Port must be number in range [0-65535]");
+            return;
+        }
+
+        // Read file
+        if (args.length < 3) {
+            System.out.println("Could not start sender: No file given.");
+            return;
+        }
+        String fileName = args[2];
+        File file = new File(fileName);
+        if (!file.isFile()) {
+            System.out.println("Could not start sender: Could not find file: " + fileName);
+            return;
+        }
+
+        // Connect to server
+        curSender.startConnection(url, portNum, fileName);
+        curSender.stopConnection();
+    }
+
     // Handles sending messages to the network until the sender is disconnected
     private void handleSender(String fileName) {
         // Read file
@@ -31,7 +72,7 @@ public class sender {
         }
 
         // Debug print packets to be sent
-        System.out.println("Debug printing packets:");
+        System.out.println("Sending message as packets:");
         for (int i = 0; i < packetList.size(); i++) {
             System.out.println("[" + packetList.get(i).getID() + "]: " + packetList.get(i).getContent() + ", ACK" + packetList.get(i).getAck() + ", digest: " + packetList.get(i).getPacket());
         }
@@ -46,8 +87,6 @@ public class sender {
             packetsSent++;
 
             // Check ACK
-            //System.out.println("Sent: " + sentPacket.toString());
-            //System.out.println("Received: " + returnPacket.toString());
             System.out.print("Waiting ACK" + waitingAck + ", " + packetsSent + ", ");
             if (returnPacket.getAck() == DROP_PACKET) { // If dropped packet, resend
                 System.out.println("DROP, resend Packet" + sentPacket.getAck());
@@ -114,48 +153,7 @@ public class sender {
         }
     }
 
-    // Main: Connects to network relay
-    public static void main(String[] args) {
-        // Only start sender if port number and ip are explicitly given
-        if (args.length < 2) {
-            System.out.println("Could not start sender: No URL/port given.");
-            return;
-        }
-        
-        // Gather info needed to start connection
-        sender curSender = new sender();
-        String url = args[0];
-        int portNum = 0;
-
-        // Get port number
-        try {
-            portNum = Integer.parseInt(args[1]);
-            if (portNum < 0 || portNum > 65535) {
-                throw new NumberFormatException("Invalid number.");
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Could not start sender: Port must be number in range [0-65535]");
-            return;
-        }
-
-        // Read file
-        if (args.length < 3) {
-            System.out.println("Could not start sender: No file given.");
-            return;
-        }
-        String fileName = args[2];
-        File file = new File(fileName);
-        if (!file.isFile()) {
-            System.out.println("Could not start sender: Could not find file: " + fileName);
-            return;
-        }
-
-        // Connect to server
-        curSender.startConnection(url, portNum, fileName);
-        curSender.stopConnection();
-    }
-
-    //
+    // Splits a message into multiple packets by space, starting at given ID
     private static ArrayList<Packet> messageToPackets(String message, int startIndex) {
         String[] parts = message.trim().replaceAll("\\P{InBasic_Latin}", "").split("\\s+");
         ArrayList<Packet> packets = new ArrayList<>();
@@ -165,7 +163,7 @@ public class sender {
         return packets;
     }
     
-    // Converts bytes to hex
+    // Converts byte array to hex
     private static String bytesToHex(byte[] byteArray) {
         StringBuffer hexStringBuffer = new StringBuffer();
         for (int i = 0; i < byteArray.length; i++) {
@@ -174,6 +172,7 @@ public class sender {
         return hexStringBuffer.toString();
     }
 
+    // Converts the byte to hex
     private static String byteToHex(byte num) {
         char[] hexDigits = new char[2];
         hexDigits[0] = Character.forDigit((num >> 4) & 0xF, 16);
@@ -181,22 +180,23 @@ public class sender {
         return new String(hexDigits);
     }
 
-    // Converts hex to bytes
+    // Converts hex to byte array
     private static byte[] hexToBytes(String hex) {
         byte[] bytes = new byte[hex.length() / 2];
         for (int i = 0; i < hex.length(); i += 2) {
             bytes[i / 2] = hexToByte(hex.substring(i, i + 2));
         }
         return bytes;
-        //return new BigInteger(hex, 16).toByteArray();
     }
 
+    // Converst the hex character to byte
     private static byte hexToByte(String hexString) {
         int firstDigit = toDigit(hexString.charAt(0));
         int secondDigit = toDigit(hexString.charAt(1));
         return (byte) ((firstDigit << 4) + secondDigit);
     }
 
+    // Converts the given character into hex
     private static int toDigit(char hexChar) {
         int digit = Character.digit(hexChar, 16);
         if(digit == -1) {
@@ -205,41 +205,61 @@ public class sender {
         }
         return digit;
     }
-    
-    private static class Packet {
+
+     /* ====================================== PACKET CLASS ========================= */
+     private static class Packet {
         private byte ack;
         private byte id;
         private int checksum;
         private String content;
         private String packet;
 
+        // Make packet from another packet's digest
         public Packet(String _packet) {
             this.packet = _packet;
+
+            // If the packet length is negative, 0, or 1, it is invalid
+            if (packet.length() <= 1) {
+                return;
+            }
+
+            // Unpack packet
+            byte[] byteList = hexToBytes(packet);
+            ack = byteList[0];
+            // If the packet length is 2, the format is ACK
+            if(packet.length() <= 2) {
+                this.checksum = byteList[1];
+                byte[] bytePacket = new byte[2];
+                bytePacket[0] = ack;
+                bytePacket[1] = (byte)checksum;
+                this.packet = bytesToHex(bytePacket);
+                return;
+            }
+
+            // If the packet length is normal, create regular packet
             this.checksum = 0;
             this.content = "";
-            byte[] byteList = hexToBytes(packet);
-            for (int i = 0; i < byteList.length; i++) {
-                if (i == 0) {
-                    ack = byteList[i];
-                } else if (i == 1) {
-                    id = byteList[i];
-                } else if (i < 6) {
+            id = byteList[1];
+            for (int i = 2; i < byteList.length; i++) {
+                if (i < 6) {
                     checksum = (checksum << 8) + (byteList[i] & 0xFF);
                 } else {
-                    content += (char)byteList[i];
+                    content += (char)((int)byteList[i]);
                 }
             }
         }
 
+        // If ACK and content are provided, make packet
         public Packet(int _ack, int _id, String _content) {
             this.ack = (byte)(_ack & 0x000000FF);
             this.id = (byte)(_id & 0x000000FF);
             this.content = _content;
             
-            checksum = calculateChecksum(content);
-            packet = makePacket(ack, id, checksum, content);
+            this.checksum = calculateChecksum(content);
+            this.packet = makePacket(ack, id, checksum, content);
         }
 
+        // Makes a packet out of the given content
         public static String makePacket(int _ack, int _id, int _checksum, String _content) {
             byte[] bytePacket = new byte[_content.length() + 6];
             bytePacket[0] = (byte)(_ack & 0x000000FF);
@@ -263,8 +283,13 @@ public class sender {
             return tempSum;
         }
 
+        // Format packet in easy to understand format
         public String toString() {
-            return "PACKET" + (int)id + " ACK" + (int)ack + ", " + checksum + ", CONTENT: " + content + ", DIGEST: " + packet;
+            if (content.equals("")) {
+                return "ACK" + (int)ack;
+            } else {
+                return "PACKET" + (int)ack + " " + (int)id + " " + checksum + " " + content + ", DIGEST: " + packet;
+            }
         }
 
         public String getPacket() { return packet; }

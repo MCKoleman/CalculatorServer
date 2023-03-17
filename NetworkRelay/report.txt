@@ -57,50 +57,127 @@ but does not need to be restarted between client connections. The server handles
 Any valid input from the client is parsed in `handleCalculation()` and the result is returned to the client.
 
 #### Sample output
-##### Server
--make server
--java -jar server.jar 9328
--Server started on port 9328
--get connection from ip.ip.ip.ip
--get: add 3 2, return: 5
--get: subtract 15 2 1, return: 12
--get: multiply 4 3 2 1, return: 24
--get: ask 12, return -1
--get: add 1, return -2
--get: multiply 1 2 3 4 5, return -3
--get: add 1 two, return -4
--get: exit, return -1
--Closing connection to client ip.ip.ip.ip
--get connection from ip.ip.ip.ip
--Closing connection to client ip.ip.ip.ip
--Server closed successfully
-*server terminated*
+##### Network
+$make network
+$java -jar network.jar 9328
+Network started on port 0.0.0.00.0.0.0:9328
+get connection from receiver 127.0.0.1
+get connection from sender 127.0.0.1
+Threads started, waiting on them to finish.
+Sender Received: PACKET0 1, CORRUPT
+Receiver Received: ACK1, DROP
+Receiver Received: ACK1, PASS
+Sender Received: PACKET0 1, DROP
+Sender Received: PACKET0 1, PASS
+Receiver Received: ACK0, DROP
+Receiver Received: ACK0, DROP
+Receiver Received: ACK0, PASS
+Sender Received: PACKET1 2, DROP
+Sender Received: PACKET1 2, PASS
+Receiver Received: ACK1, CORRUPT
+Sender Received: PACKET0 3, PASS
+Receiver Received: ACK0, PASS
+Sender Received: PACKET1 4, DROP
+Sender Received: PACKET1 4, DROP
+Sender Received: PACKET1 4, DROP
+Sender Received: PACKET1 4, PASS
+Receiver Received: ACK1, DROP
+Receiver Received: ACK1, PASS
+Sender Received: PACKET0 5, PASS
+Receiver Received: ACK0, PASS
+Sender Received: PACKET1 6, PASS
+Receiver Received: ACK1, DROP
+Receiver Received: ACK1, PASS
+Sender Received: PACKET0 7, PASS
+Receiver Received: ACK0, DROP
+Receiver Received: ACK0, CORRUPT
+Sender Received: PACKET1 8, PASS
+Receiver Received: ACK1, DROP
+Receiver Received: ACK1, CORRUPT
+Sender Received: PACKET0 9, DROP
+Sender Received: PACKET0 9, DROP
+Sender Received: PACKET0 9, DROP
+Sender Received: PACKET0 9, CORRUPT
+Receiver Received: ACK1, CORRUPT
+Sender Received: PACKET0 9, PASS
+Receiver Received: ACK0, DROP
+Receiver Received: ACK0, PASS
+Sender Received: PACKET1 10, PASS
+Receiver Received: ACK1, DROP
+Receiver Received: ACK1, CORRUPT
+Sender Received: PACKET0 11, PASS
+Receiver Received: ACK0, CORRUPT
+Sender thread exiting...
+Sender thread finished.
+Receiver thread finished.
+Threads finished.
+Network closed successfully
+*Network terminated*
 
-##### Client
--make client
--java -jar client.jar ip.ip.ip.ip 9328
--receive: Hello!
--add 3 2
--receive: 5
--subtract 15 2 1
--receive 12
--multiply 4 3 2 1
--receive 24
--ask 12
--receive: -1: incorrect operation command
--add 1
--receive: -2: number of inputs is less than two
--multiply 1 2 3 4 5
--receive: -3: number of inputs is less than two
--add 1 two
--receive: -4: one or more of the inputs contain(s) non-number(s)
--exit
--receive: -1: incorrect operation command
--bye
--receive: -5: exit
-*client terminated*
--java -jar client.jar ip.ip.ip.ip 9328
--receive: Hello!
--terminate
--receive: -5: exit
-*client terminated*
+##### Receiver
+$make receiver
+$java -jar receiver.jar 0.0.0.0 9328
+receive: Network Hello!
+Waiting 0, 1, 1, PACKET0 1 318 You, ACK1
+Waiting 0, 2, 1, ACK2, ACK1
+Waiting 0, 3, 1, PACKET0 1 317 You, ACK0
+Waiting 1, 4, 2, ACK2, ACK0
+Waiting 1, 5, 2, ACK2, ACK0
+Waiting 1, 6, 2, PACKET1 2 312 are, ACK1
+Waiting 0, 7, 3, PACKET0 3 230 my, ACK0
+Waiting 1, 8, 4, PACKET1 4 923 sunshine., ACK1
+Waiting 0, 9, 5, ACK2, ACK1
+Waiting 0, 10, 5, PACKET0 5 198 My, ACK0
+Waiting 1, 11, 6, PACKET1 6 450 only, ACK1
+Waiting 0, 12, 7, ACK2, ACK1
+Waiting 0, 13, 7, PACKET0 7 921 sunshine,, ACK0
+Waiting 1, 14, 8, ACK2, ACK0
+Waiting 1, 15, 8, PACKET1 8 317 You, ACK1
+Waiting 0, 16, 9, ACK2, ACK1
+Waiting 0, 17, 9, PACKET0 9 415 make, ACK1
+Waiting 0, 18, 9, PACKET0 9 414 make, ACK0
+Waiting 1, 19, 10, ACK2, ACK0
+Waiting 1, 20, 10, PACKET1 10 210 me, ACK1
+Waiting 0, 21, 11, ACK2, ACK1
+Waiting 0, 22, 11, PACKET0 11 592 happy., ACK0
+Received message: You are my sunshine. My only sunshine, You make me happy.
+*receiver terminated*
+
+##### Sender
+$make sender
+$java -jar sender.jar 0.0.0.0 9328 message.txt
+receive: Network Hello!
+Sending message as packets:
+[1]: You, ACK0, digest: 00010000013d596f75
+[2]: are, ACK1, digest: 010200000138617265
+[3]: my, ACK0, digest: 0003000000e66d79
+[4]: sunshine., ACK1, digest: 01040000039b73756e7368696e652e
+[5]: My, ACK0, digest: 0005000000c64d79
+[6]: only, ACK1, digest: 0106000001c26f6e6c79
+[7]: sunshine,, ACK0, digest: 00070000039973756e7368696e652c
+[8]: You, ACK1, digest: 01080000013d596f75
+[9]: make, ACK0, digest: 00090000019e6d616b65
+[10]: me, ACK1, digest: 010a000000d26d65
+[11]: happy., ACK0, digest: 000b0000025068617070792e
+Waiting ACK0, 1, CORRUPT, resend Packet0
+Waiting ACK0, 2, DROP, resend Packet0
+Waiting ACK0, 3, PASS, sending next Packet1
+Waiting ACK1, 4, DROP, resend Packet1
+Waiting ACK1, 5, PASS, sending next Packet0
+Waiting ACK0, 6, PASS, sending next Packet1
+Waiting ACK1, 7, DROP, resend Packet1
+Waiting ACK1, 8, DROP, resend Packet1
+Waiting ACK1, 9, DROP, resend Packet1
+Waiting ACK1, 10, PASS, sending next Packet0
+Waiting ACK0, 11, PASS, sending next Packet1
+Waiting ACK1, 12, PASS, sending next Packet0
+Waiting ACK0, 13, PASS, sending next Packet1
+Waiting ACK1, 14, PASS, sending next Packet0
+Waiting ACK0, 15, DROP, resend Packet0
+Waiting ACK0, 16, DROP, resend Packet0
+Waiting ACK0, 17, DROP, resend Packet0
+Waiting ACK0, 18, CORRUPT, resend Packet0
+Waiting ACK0, 19, PASS, sending next Packet1
+Waiting ACK1, 20, PASS, sending next Packet0
+Waiting ACK0, 21, no more packets to send
+*sender terminated*

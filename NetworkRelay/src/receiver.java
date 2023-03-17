@@ -11,6 +11,35 @@ public class receiver {
     private PrintWriter out;
     private BufferedReader in;
 
+    // Receiver: receives messages from sender through network relay
+    public static void main(String[] args) {
+        // Only start receiver if port number and ip are explicitly given
+        if (args.length < 2) {
+            System.out.println("Could not start receiver: No URL/port given.");
+            return;
+        }
+        
+        // Gather info needed to start connection
+        receiver curReceiver = new receiver();
+        String url = args[0];
+        int portNum = 0;
+
+        // Get port number
+        try {
+            portNum = Integer.parseInt(args[1]);
+            if (portNum < 0 || portNum > 65535) {
+                throw new NumberFormatException("Invalid number.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Could not start receiver: Port must be number in range [0-65535]");
+            return;
+        }
+
+        // Connect to server
+        curReceiver.startConnection(url, portNum);
+        curReceiver.stopConnection();
+    }
+
     // Handles sending messages to the network until the receiver is disconnected
     private void handleReceiver() {
         ArrayList<Packet> packetList = new ArrayList<>();
@@ -38,14 +67,14 @@ public class receiver {
                 
                 // Receive correct package and acknowledge it
                 if (isCorrectAck && isCorrectChecksum && isCorrectPacket) {
-                    System.out.println("ACK" + (int)waitingAck);
-                    out.println(new Packet(waitingAck, 0, "").getPacket());
+                    System.out.println(", ACK" + (int)waitingAck);
+                    out.println(new Packet(waitingAck).getPacket());
                     packetList.add(inputPacket);
                     waitingAck = getOppositeAck(waitingAck);
                     expectedID++;
                 } else {
-                    System.out.println("ACK" + (int)getOppositeAck(waitingAck));
-                    out.println(new Packet(getOppositeAck(waitingAck), 0, "").getPacket());
+                    System.out.println(", ACK" + (int)getOppositeAck(waitingAck));
+                    out.println(new Packet(getOppositeAck(waitingAck)).getPacket());
                 }
             } catch (IOException e) {
                 System.out.println("Receiver could not read input.");
@@ -112,41 +141,12 @@ public class receiver {
         }
     }
 
-    // Main: Connects to network relay
-    public static void main(String[] args) {
-        // Only start receiver if port number and ip are explicitly given
-        if (args.length < 2) {
-            System.out.println("Could not start receiver: No URL/port given.");
-            return;
-        }
-        
-        // Gather info needed to start connection
-        receiver curReceiver = new receiver();
-        String url = args[0];
-        int portNum = 0;
-
-        // Get port number
-        try {
-            portNum = Integer.parseInt(args[1]);
-            if (portNum < 0 || portNum > 65535) {
-                throw new NumberFormatException("Invalid number.");
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Could not start receiver: Port must be number in range [0-65535]");
-            return;
-        }
-
-        // Connect to server
-        curReceiver.startConnection(url, portNum);
-        curReceiver.stopConnection();
-    }
-
     // Returns the opposite ACK of the given ACK
     private static byte getOppositeAck(byte ack) {
         return (byte)((ack + 1) % 2);
     }
 
-    // Converts bytes to hex
+    // Converts byte array to hex
     private static String bytesToHex(byte[] byteArray) {
         StringBuffer hexStringBuffer = new StringBuffer();
         for (int i = 0; i < byteArray.length; i++) {
@@ -155,6 +155,7 @@ public class receiver {
         return hexStringBuffer.toString();
     }
 
+    // Converts the byte to hex
     private static String byteToHex(byte num) {
         char[] hexDigits = new char[2];
         hexDigits[0] = Character.forDigit((num >> 4) & 0xF, 16);
@@ -162,7 +163,7 @@ public class receiver {
         return new String(hexDigits);
     }
 
-    // Converts hex to bytes
+    // Converts hex to byte array
     private static byte[] hexToBytes(String hex) {
         byte[] bytes = new byte[hex.length() / 2];
         for (int i = 0; i < hex.length(); i += 2) {
@@ -171,12 +172,14 @@ public class receiver {
         return bytes;
     }
 
+    // Converst the hex character to byte
     private static byte hexToByte(String hexString) {
         int firstDigit = toDigit(hexString.charAt(0));
         int secondDigit = toDigit(hexString.charAt(1));
         return (byte) ((firstDigit << 4) + secondDigit);
     }
 
+    // Converts the given character into hex
     private static int toDigit(char hexChar) {
         int digit = Character.digit(hexChar, 16);
         if(digit == -1) {
@@ -186,52 +189,59 @@ public class receiver {
         return digit;
     }
     
-    private static class Packet {
+     /* ====================================== PACKET CLASS ========================= */
+     private static class Packet {
         private byte ack;
         private byte id;
         private int checksum;
         private String content;
         private String packet;
 
+        // Make packet from another packet's digest
         public Packet(String _packet) {
             this.packet = _packet;
+
+            // If the packet length is negative, 0, or 1, it is invalid
+            if (packet.length() <= 1) {
+                return;
+            }
+
+            // Unpack packet
+            byte[] byteList = hexToBytes(packet);
+            ack = byteList[0];
+            // If the packet length is 2, the format is ACK
+            if(packet.length() <= 2) {
+                this.checksum = byteList[1];
+                byte[] bytePacket = new byte[2];
+                bytePacket[0] = ack;
+                bytePacket[1] = (byte)checksum;
+                this.packet = bytesToHex(bytePacket);
+                return;
+            }
+
+            // If the packet length is normal, create regular packet
             this.checksum = 0;
             this.content = "";
-            byte[] byteList = hexToBytes(packet);
-            for (int i = 0; i < byteList.length; i++) {
-                if (i == 0) {
-                    ack = byteList[i];
-                } else if (i == 1) {
-                    id = byteList[i];
-                } else if (i < 6) {
+            id = byteList[1];
+            for (int i = 2; i < byteList.length; i++) {
+                if (i < 6) {
                     checksum = (checksum << 8) + (byteList[i] & 0xFF);
                 } else {
-                    content += (char)byteList[i];
+                    content += (char)((int)byteList[i]);
                 }
             }
         }
 
-        public Packet(int _ack, int _id, String _content) {
+        // If only an ACK is provided, the packet format is ACK
+        public Packet(int _ack) {
             this.ack = (byte)(_ack & 0x000000FF);
-            this.id = (byte)(_id & 0x000000FF);
-            this.content = _content;
-            
-            checksum = calculateChecksum(content);
-            packet = makePacket(ack, id, checksum, content);
-        }
-
-        public static String makePacket(int _ack, int _id, int _checksum, String _content) {
-            byte[] bytePacket = new byte[_content.length() + 6];
-            bytePacket[0] = (byte)(_ack & 0x000000FF);
-            bytePacket[1] = (byte)(_id & 0x000000FF);
-            bytePacket[2] = (byte)((_checksum & 0xFF000000) >> 24);
-            bytePacket[3] = (byte)((_checksum & 0x00FF0000) >> 16);
-            bytePacket[4] = (byte)((_checksum & 0x0000FF00) >> 8);
-            bytePacket[5] = (byte)((_checksum & 0x000000FF) >> 0);
-            for (int i = 0; i < _content.length(); i++) {
-                bytePacket[i + 6] = (byte)((int)_content.charAt(i) & 0x000000FF);
-            }
-            return bytesToHex(bytePacket);
+            this.id = 0;
+            this.content = "";
+            this.checksum = 0;
+            byte[] bytePacket = new byte[2];
+            bytePacket[0] = ack;
+            bytePacket[1] = (byte)checksum;
+            this.packet = bytesToHex(bytePacket);
         }
 
         // Calculates the checksum for the given content
@@ -243,9 +253,13 @@ public class receiver {
             return tempSum;
         }
 
+        // Format packet in easy to understand format
         public String toString() {
-            return (int)ack + " " + (int)id + " " + checksum + " " + content;
-            //return "PACKET" + (int)id + " ACK" + (int)ack + ", " + checksum + ", CONTENT: " + content + ", DIGEST: " + packet;
+            if (content.equals("")) {
+                return "ACK" + (int)ack;
+            } else {
+                return "PACKET" + (int)ack + " " + (int)id + " " + checksum + " " + content;
+            }
         }
 
         public Boolean verifyChecksum() { return calculateChecksum(content) == getChecksum(); }

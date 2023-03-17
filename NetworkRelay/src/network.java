@@ -8,8 +8,8 @@ public class network {
     private static final String SENDER_HELLO = "Sender Hello!";
     private static final String RECEIVER_HELLO = "Receiver Hello!";
     private static final String NETWORK_HELLO = "Network Hello!";
-    private static final String RECEIVER = "receiver";
-    private static final String SENDER = "sender";
+    private static final String RECEIVER = "Receiver";
+    private static final String SENDER = "Sender";
 
     // Network probabilities
     private static final float PASS_CHANCE = 0.5f;
@@ -30,6 +30,33 @@ public class network {
     private String receiverIP;
     private NetworkClientThread networkSenderThread;
     private NetworkClientThread networkReceiverThread;
+
+    // Network: Connects sender to receiver and transmits messages between them
+    public static void main(String[] args) {
+        network curNetwork = new network();
+        int portNum = 0;
+
+        // Only start network if port number is explicitly given
+        if (args.length < 1) {
+            System.out.println("Could not start network: No port number given.");
+            return;
+        }
+        
+        // Get port number
+        try {
+            portNum = Integer.parseInt(args[0]);
+            if(portNum < 0 || portNum > 65535) {
+                throw new NumberFormatException("Invalid number.");
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Could not start network: Port must be number in range [0-65535]");
+            return;
+        }
+
+        // Start server
+        curNetwork.startNetwork(portNum);
+        curNetwork.stopNetwork();
+    }
 
     // Handles connecting clients to the server
     private void handleNetwork() {
@@ -121,33 +148,6 @@ public class network {
         System.out.println("Network closed successfully");
     }
 
-    // Main: Parses input params and starts the network
-    public static void main(String[] args) {
-        network curNetwork = new network();
-        int portNum = 0;
-
-        // Only start network if port number is explicitly given
-        if (args.length < 1) {
-            System.out.println("Could not start network: No port number given.");
-            return;
-        }
-        
-        // Get port number
-        try {
-            portNum = Integer.parseInt(args[0]);
-            if(portNum < 0 || portNum > 65535) {
-                throw new NumberFormatException("Invalid number.");
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Could not start network: Port must be number in range [0-65535]");
-            return;
-        }
-
-        // Start server
-        curNetwork.startNetwork(portNum);
-        curNetwork.stopNetwork();
-    }
-
     // Returns a random packet action
     private static int getRandomPacketAction() {
         Random rand = new Random();
@@ -186,11 +186,11 @@ public class network {
                 return new Packet(Packet.makePacket(packet.getAck(), packet.getID(), packet.getChecksum()+1, packet.getContent()));
             case DROP_PACKET:
             default:
-                return new Packet(DROP_PACKET, 0, "");
+                return new Packet(DROP_PACKET);
         }
     }
 
-    // Converts bytes to hex
+    // Converts byte array to hex
     private static String bytesToHex(byte[] byteArray) {
         StringBuffer hexStringBuffer = new StringBuffer();
         for (int i = 0; i < byteArray.length; i++) {
@@ -199,6 +199,7 @@ public class network {
         return hexStringBuffer.toString();
     }
 
+    // Converts the byte to hex
     private static String byteToHex(byte num) {
         char[] hexDigits = new char[2];
         hexDigits[0] = Character.forDigit((num >> 4) & 0xF, 16);
@@ -206,7 +207,7 @@ public class network {
         return new String(hexDigits);
     }
 
-    // Converts hex to bytes
+    // Converts hex to byte array
     private static byte[] hexToBytes(String hex) {
         byte[] bytes = new byte[hex.length() / 2];
         for (int i = 0; i < hex.length(); i += 2) {
@@ -215,12 +216,14 @@ public class network {
         return bytes;
     }
 
+    // Converst the hex character to byte
     private static byte hexToByte(String hexString) {
         int firstDigit = toDigit(hexString.charAt(0));
         int secondDigit = toDigit(hexString.charAt(1));
         return (byte) ((firstDigit << 4) + secondDigit);
     }
 
+    // Converts the given character into hex
     private static int toDigit(char hexChar) {
         int digit = Character.digit(hexChar, 16);
         if(digit == -1) {
@@ -230,6 +233,7 @@ public class network {
         return digit;
     }
 
+    /* ====================================== PACKET CLASS ========================= */
     private static class Packet {
         private byte ack;
         private byte id;
@@ -237,12 +241,31 @@ public class network {
         private String content;
         private String packet;
 
+        // Make packet from another packet's digest
         public Packet(String _packet) {
             this.packet = _packet;
-            this.checksum = 0;
-            this.content = "";
+
+            // If the packet length is negative, 0, or 1, it is invalid
+            if (packet.length() <= 1) {
+                return;
+            }
+
+            // Unpack packet
             byte[] byteList = hexToBytes(packet);
             ack = byteList[0];
+            // If the packet length is 2, the format is ACK
+            if(packet.length() <= 2) {
+                this.checksum = byteList[1];
+                byte[] bytePacket = new byte[2];
+                bytePacket[0] = ack;
+                bytePacket[1] = (byte)checksum;
+                this.packet = bytesToHex(bytePacket);
+                return;
+            }
+
+            // If the packet length is normal, create regular packet
+            this.checksum = 0;
+            this.content = "";
             id = byteList[1];
             for (int i = 2; i < byteList.length; i++) {
                 if (i < 6) {
@@ -253,15 +276,19 @@ public class network {
             }
         }
 
-        public Packet(int _ack, int _id, String _content) {
+        // If only an ACK is provided, the packet format is ACK
+        public Packet(int _ack) {
             this.ack = (byte)(_ack & 0x000000FF);
-            this.id = (byte)(_id & 0x000000FF);
-            this.content = _content;
-            
-            checksum = calculateChecksum(content);
-            packet = makePacket(ack, id, checksum, content);
+            this.id = 0;
+            this.content = "";
+            this.checksum = 0;
+            byte[] bytePacket = new byte[2];
+            bytePacket[0] = ack;
+            bytePacket[1] = (byte)checksum;
+            this.packet = bytesToHex(bytePacket);
         }
 
+        // Makes a packet out of the given content
         public static String makePacket(int _ack, int _id, int _checksum, String _content) {
             byte[] bytePacket = new byte[_content.length() + 6];
             bytePacket[0] = (byte)(_ack & 0x000000FF);
@@ -276,21 +303,12 @@ public class network {
             return bytesToHex(bytePacket);
         }
 
-        // Calculates the checksum for the given content
-        public static int calculateChecksum(String content) {
-            int tempSum = 0;
-            for (int i = 0; i < content.length(); i++) {
-                tempSum += (int)content.charAt(i);
-            }
-            return tempSum;
-        }
-
         // Returns the packet as a string
         public String toString() {
             if (content.equals("")) {
                 return "ACK" + (int)ack;
             } else {
-                return "Packet" + (int)id + ", " + checksum + ", ACK" + (int)ack + ", CONTENT: " + content + ", DIGEST: " + packet;
+                return "PACKET" + (int)ack + " " + (int)id;
             }
         }
 
@@ -301,6 +319,7 @@ public class network {
         public String getContent() { return content; }
     }
 
+    /* ====================================== NETWORK CLIENT THREAD CLASS ========================= */
     private static class NetworkClientThread extends Thread {
         private Socket inSocket;
         private Socket outSocket;
@@ -309,12 +328,14 @@ public class network {
         private BufferedReader in;
         private String name;
 
+        // Make new network client thread
         public NetworkClientThread(Socket _inSocket, Socket _outSocket, String _name) {
             this.inSocket = _inSocket;
             this.outSocket = _outSocket;
             this.name = _name;
         }
 
+        // Runs the thread
         public void run() {
             try {
                 out = new PrintWriter(outSocket.getOutputStream(), true);
