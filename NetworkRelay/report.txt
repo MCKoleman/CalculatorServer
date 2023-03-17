@@ -1,62 +1,88 @@
-# CNT4007 - Programming Assignment 1
+# CNT4007 - Programming Assignment 2
 Manu Kolehmainen
 UFID: 93281150
 email: manu.kolehmainen@ufl.edu
 
 ### Compilation
 The code works on Windows/Linux/Unix, and can be compiled and ran the same way on each device.
-The program is written in java, so a JDK (preferably 1.8 or higher) or JRE is required to be
+The program is written in Java, so a JDK (preferably 1.8 or higher) or JRE is required to be
 installed on the device to compile and run the code.
 The code can be compiled into jar files and ran using the commands:
-`make client`
-`java -jar client.jar [server_url/ip] [port]`
+`make network`
+`java -jar network.jar [port]`
 
-`make server`
-`java -jar server.jar [port]`
+`make receiver`
+`java -jar receiver.jar [serverURL/IP] [port]`
+
+`make sender`
+`java -jar sender.jar [serverURL/IP] [port] [fileName]`
 
 Alternatively, the code can be run directly without compiling into a jar by using
 `cd src`
-to change the directory to the source directory, and running
-`javac client.java`
-or
-`javac server.java`
-to compile the client and server respectively, and then using
-`java client [server_url/ip] [port]`
-or
-`java server [port]`
-to run the client and server respectively.
+to change the directory to the source directory, and running the following lines:
+`javac network.java`
+`javac receiver.java`
+`javac sender.java`
+to compile the each component, and then using
+`java network [port]`
+`java receiver [serverURL/IP] [port]`
+`java sender [serverURL/IP] [port] [fileName]`
+to run each component.
+Note that the files must be run in the order Network -> Receiver -> Sender,
+but what device each of the files is run on does not matter, as long as all of them connect
+to the IP address of the device that ran Network. All parameters are required for each of the components to function.
+Additionally, the fileName given to the Sender must exist and be readable by Sender. This is best accomplished by placing
+the file to be read in the same directory as the jar files (ie. the root directory).
 
 ### Functions
-Only src/client.java and src/server.java are required for the program to function. The project is 
-structured to allow the source files to be compiled into jar files, but this is not required for them to function.
+Only the source files in /src/ are required for the program to function, ie. network.java, receiver.java, and sender.java.
+The project is structured to allow the source files to be compiled into jar files, but this is not required for them to function.
+None of the components accept user input, all input must be given as command line arguments when running them.
+Each component terminates itself once the message has been successfully transmitted, first the sender, then the network, and finally
+the receiver.
 
 ### Results
-The client and server behave exactly as specified in the specification document. No abnormal results or bugs were found.
-Whenever the server receives input, it parses the input and returns the correct result, either an error code or
-the correct calculation. The program is limited in only accepting the three types of arithmetic operations
-(add, subtract, multiply) and in only being able to connect to one client at a time (ie. it does not use parallel
-processing or threads). These features could easily be added to the server though, but were not requested for this assignment.
+When testing, no bugs were found in the system. The system behaves exactly as specified in the specification document.
+However, the files being read are not sanitized extensively before being used as input,
+so inputting a file with raw binary data and unorthodox whitespace conventions could cause issues, but this could not be replicated.
+If the sender does not successfully send the message to the receiver or the network or receiver experience an IO failure, then
+the programs will not automatically terminate. Additionally, the network assumes it will get one connection from a receiver
+and one connection from a sender, and no more or less. If the network receives 2 different connections from a sender or receiver,
+it will replace the old connection with a new one, until it receives connections of both types, after which it exits when both
+connections have ended.
 
-#### Client.java
-When starting the client, both a valid server URL or IP address are required to be given, along with the port
-the server is running on. If the client doesn't receive these values or the requested server does not exist,
-the client closes itself with an error. If the server exists, the client attempts to start a connection with it
-using `startConnection()` to open a socket between the client and server.
-The client attempts a handshake with the server, and if it receives the correct response
-it starts handling client-side operations with `handleClient()`, which continues until shut down, calling `stopConnection()`
-to close the socket.
-While connected to the server, the client continually accepts user input, sending each line to server for validation.
-The server then returns the result of the input, either as an error code or the result of the calculation, and the client
-displays the result. When receiving -5 from the server, the client shuts down.
+### Code Structure
+Due to the nature of having separate source files running on different machines, each of the three files have some redundancy.
+The Packet class is defined for each class separately, despite having almost identical functionality for all three parts.
+The class allows text to be formatted into packets, transmitted as a string over the network, and be interpreted from the 
+transmitted hex digest string. The Packet class also calculates the checksum of the packet and allows the checksum to be checked
+for correctness. The bytesToHex(), byteToHex(), hexToBytes(), hexToByte(), and toDigit() functions are also implemented for each part to allow
+for easy and reliable transmission of hex data between components.
 
-#### Server.java
-The server must be started before the client. When the server is ran, it opens a socket with
-`startServer()` Once the server is active, it can connect to one client at a time,
-but does not need to be restarted between client connections. The server handles connecting to clients in
-`handleServer()`, and handles input from clients in `handleClient()` while it is connected to a client.
-Any valid input from the client is parsed in `handleCalculation()` and the result is returned to the client.
+#### Network.java
+The Network class also implements a NetworkClientThread class that allows the Network to listen to input from two connections
+simultaneously. The Network opens a new server socket and then listens to handshakes from connections to that socket from clients
+until it is connected to one receiver and one sender. It then opens up two NetworkClientThreads, one for reading input from the sender
+and writing it to the receiver (or back to the sender if the packet is dropped), and one for reading ACK packets from the receiver and
+writing it to the sender. One class accomplishes both of this. The network simulates an unreliable connection by choosing a random
+action to perform on received packets (pass, corrupt, or drop the packet) before sending it to the target recipient.
+When the network receives a -1 message from the sender, it closes the threads and sends the same terminate command to the receiver before closing itself.
 
-#### Sample output
+#### Receiver.java
+The Receiver class opens a connection to the Network relay and listens to input from the network until a complete message is received
+followed by a termination command -1. If the Receiver receives a corrupt packet, or the wrong packet, it sends an ACK to the network
+in compliance with RDT 3.0 to request the sender to resend that packet. Once all the packets have been received, the receiver
+reconstructs the message (without newlines) and prints it out.
+
+#### Sender.java
+The Sender class reads a file and breaks it up into packets to send over a network relay and 
+opens a connection to the Network and waits for a valid hankshake before starting transmitting packets.
+Once the sender receives a valid handshake, it starts sending the packets to the receiver through the network
+one at a time, waiting for an ACK before sending the next message. If the sender receives the wrong ACK, it retransmits
+the packet until it receives a valid ACK. Once the sender has sent all packets, it sends a -1 terminate command to network
+and closes its connection.
+
+#### Sample output (Screenshots formatted into .txt)
 ##### Network
 $make network
 $java -jar network.jar 9328
