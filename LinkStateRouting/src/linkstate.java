@@ -15,7 +15,7 @@ public class linkstate {
                     continue;
                 }
                 for (Map.Entry<Integer, Integer> entry : temp.getEdges().entrySet()) {
-                    System.out.println(i + " " + entry.getKey() + " " + entry.getValue());
+                    System.out.println("# " + i + " " + entry.getKey() + " " + entry.getValue());
                 }
             }
         }
@@ -69,11 +69,6 @@ public class linkstate {
         public int getCost(int other) {
             // If the nodes are not neighbors, return -1
             return (edges.get(other) != null) ? edges.get(other) : -1;
-        }
-
-        // Returns whether the given node is a neighbor of this node
-        public Boolean isNeighbor(int other) {
-            return edges.containsKey(other);
         }
 
         public HashMap<Integer, Integer> getEdges() { return edges; }
@@ -169,6 +164,10 @@ public class linkstate {
 
     // Prints the contents of the graph
     public void print() {
+        System.out.println("# Read graph:");
+        graph.print();
+        System.out.println();
+
         System.out.print("Step");
         for (int i = 1; i < graph.size(); i++) {
             System.out.print(",D" + i + ",P" + i);

@@ -1,0 +1,6 @@
+{
+    "java.project.sourcePaths": [
+        "NetworkRelay\\src",
+        "LinkStateRouting\\src"
+    ]
+}
