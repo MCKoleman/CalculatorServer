@@ -1,8 +1,4 @@
-# CNT4007 - Programming Assignment 2
-Manu Kolehmainen
-UFID: 93281150
-email: manu.kolehmainen@ufl.edu
-
+# Sample Sender/Receiver/Network Relay Server
 ### Compilation
 The code works on Windows/Linux/Unix, and can be compiled and ran the same way on each device.
 The program is written in Java, so a JDK (preferably 1.8 or higher) or JRE is required to be
