@@ -3,16 +3,16 @@
 The code works on Windows/Linux/Unix, and can be compiled and ran the same way on each device. 
 The program is written in Java, so a JDK (preferably 1.8 or higher) or JRE is required to be installed on the 
 device to compile and run the code. The code can be compiled into jar files and ran using the 
-commands: 
-`make linkstate` 
-`java -jar linkstate.jar [fileName]` 
+commands:  
+`make linkstate`  
+`java -jar linkstate.jar [fileName]`  
  
 Alternatively, the code can be run directly without compiling into a jar by using  
-`cd src` 
-to change the directory to the source directory, and running the following command: 
-`javac linkstate.java` 
-to compile the component, and then using 
-`java linkstate [fileName]` 
+`cd src`  
+to change the directory to the source directory, and running the following command:  
+`javac linkstate.java`  
+to compile the component, and then using  
+`java linkstate [fileName]`  
 to run the component. 
 Note that the parameter is required for the component to function. Additionally, the fileName given to 
 the Linkstate must exist and be readable by Linkstate. This is best accomplished by placing the file to be 
